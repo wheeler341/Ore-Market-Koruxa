@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <meta
+    name="theme-color"
+    content="#050b10"
+  />
+
+  <title>Koruxa Market</title>
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  />
+
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  />
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+
+  <link
+    rel="stylesheet"
+    href="styles.css"
+  />
+</head>
+
+<body>
+
+  <div class="background-glow glow-one"></div>
+  <div class="background-glow glow-two"></div>
+
+
+  <main class="app-shell">
+
+    <!-- =====================================================
+         HERO
+    ====================================================== -->
+
+    <header class="hero">
+
+      <div class="hero-badge">
+        ⚒ KORUXA TRADING POST
+      </div>
+
+      <h1>
+        Ore & Gem
+        <span>Market</span>
+      </h1>
+
+      <p class="hero-description">
+        Build your order, review your basket, and submit it directly
+        to the market.
+      </p>
+
+
+      <div class="market-rule">
+
+        <div class="rule-icon">
+          💎
+        </div>
+
+        <div>
+          <strong>Automatic Gem Ore Requirement</strong>
+
+          <p>
+            Every uncut gem requires
+            <b>6 matching ore</b>.
+            Add gems freely and the market will automatically add
+            only the ore you're missing.
+          </p>
+        </div>
+
+      </div>
+
+
+      <div class="hero-stats">
+
+        <div class="hero-stat">
+          <span class="stat-value">
+            16
+          </span>
+
+          <span class="stat-label">
+            Materials
+          </span>
+        </div>
+
+
+        <div class="hero-stat">
+          <span class="stat-value">
+            13
+          </span>
+
+          <span class="stat-label">
+            Gem Types
+          </span>
+        </div>
+
+
+        <div class="hero-stat">
+          <span class="stat-value">
+            6:1
+          </span>
+
+          <span class="stat-label">
+            Ore / Gem
+          </span>
+        </div>
+
+      </div>
+
+    </header>
+
+
+
+    <!-- =====================================================
+         MARKET HEADER
+    ====================================================== -->
+
+    <section class="market-heading">
+
+      <div>
+        <div class="section-kicker">
+          MARKETPLACE
+        </div>
+
+        <h2>
+          Browse Materials
+        </h2>
+      </div>
+
+      <a
+        href="#basket"
+        class="basket-shortcut"
+      >
+        🛒 Basket
+
+        <span id="topBasketCount">
+          0
+        </span>
+      </a>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         SEARCH
+    ====================================================== -->
+
+    <section class="toolbar">
+
+      <label class="search-box">
+
+        <span class="search-icon">
+          🔎
+        </span>
+
+        <input
+          id="search"
+          type="search"
+          placeholder="Search Dustite, Opal, Infernite..."
+          autocomplete="off"
+        />
+
+      </label>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         MATERIAL LIST
+    ====================================================== -->
+
+    <section
+      id="materialList"
+      class="material-list"
+    ></section>
+
+
+
+    <!-- =====================================================
+         CHECKOUT / BASKET
+    ====================================================== -->
+
+    <section
+      id="basket"
+      class="basket-section"
+    >
+
+      <div class="basket-title-row">
+
+        <div>
+
+          <div class="section-kicker">
+            CHECKOUT
+          </div>
+
+          <h2>
+            Your Basket
+          </h2>
+
+          <p>
+            Review your order before submitting.
+          </p>
+
+        </div>
+
+
+        <div class="basket-count">
+
+          <span id="cartCount">
+            0
+          </span>
+
+          <small>
+            items
+          </small>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- CART CONTENT -->
+
+      <div
+        id="cartItems"
+        class="cart-items"
+      >
+
+        <div class="empty-basket">
+
+          <div class="empty-icon">
+            🛒
+          </div>
+
+          <strong>
+            Your basket is empty
+          </strong>
+
+          <span>
+            Add some ore or gems above.
+          </span>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- TOTAL -->
+
+      <div class="basket-summary">
+
+        <div>
+
+          <span>
+            Estimated Total
+          </span>
+
+          <small>
+            Based on current market pricing
+          </small>
+
+        </div>
+
+        <strong id="grandTotal">
+          0 GP
+        </strong>
+
+      </div>
+
+
+      <div
+        id="validationMessage"
+        class="validation-message"
+      ></div>
+
+
+
+      <!-- CUSTOMER INFO -->
+
+      <div class="checkout-divider"></div>
+
+
+      <div class="checkout-info">
+
+        <div class="checkout-heading">
+
+          <div class="checkout-heading-icon">
+            👤
+          </div>
+
+          <div>
+
+            <h3>
+              Buyer Information
+            </h3>
+
+            <p>
+              Tell us who the order belongs to.
+            </p>
+
+          </div>
+
+        </div>
+
+
+
+        <label class="form-field">
+
+          <span>
+            Discord / Game Name
+            <b>*</b>
+          </span>
+
+          <input
+            id="customerName"
+            type="text"
+            maxlength="60"
+            placeholder="Enter your Discord or Koruxa name"
+            autocomplete="off"
+          />
+
+        </label>
+
+
+
+        <label class="form-field">
+
+          <span>
+            Order Notes
+
+            <small>
+              Optional
+            </small>
+          </span>
+
+          <textarea
+            id="orderNotes"
+            maxlength="500"
+            rows="4"
+            placeholder="Special requests, preferred contact method, availability, etc."
+          ></textarea>
+
+        </label>
+
+      </div>
+
+
+
+      <!-- ACTIONS -->
+
+      <div class="checkout-actions">
+
+        <button
+          id="clearOrder"
+          class="clear-button"
+          type="button"
+        >
+          Clear Basket
+        </button>
+
+
+        <button
+          id="submitOrder"
+          class="submit-button"
+          type="button"
+        >
+
+          <span>
+            Submit Order
+          </span>
+
+          <span class="submit-arrow">
+            →
+          </span>
+
+        </button>
+
+      </div>
+
+
+      <div
+        id="submitStatus"
+        class="submit-status"
+      ></div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
+
+    <footer class="market-footer">
+
+      <div>
+        ⚒ Koruxa Ore & Gem Market
+      </div>
+
+      <p>
+        Gem orders automatically include the required matching ore.
+      </p>
+
+    </footer>
+
+  </main>
+
+
+
+  <!-- =====================================================
+       MATERIAL CARD TEMPLATE
+  ====================================================== -->
+
+  <template id="materialTemplate">
+
+    <article class="material-card">
+
+      <div class="material-accent"></div>
+
+
+      <div class="material-header">
+
+        <div class="material-visual">
+
+          <div class="visual-glow"></div>
+
+          <div class="visual-icon"></div>
+
+        </div>
+
+
+        <div class="material-info">
+
+          <div class="material-category"></div>
+
+          <h3></h3>
+
+          <div class="material-secondary"></div>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- TYPE SELECTOR -->
+
+      <div class="type-selector">
+
+        <button
+          class="type-button ore-button"
+          data-type="ore"
+          type="button"
+        >
+          <span class="type-icon">
+            ⛏️
+          </span>
+
+          <span>
+            Ore
+          </span>
+        </button>
+
+
+        <button
+          class="type-button gem-button"
+          data-type="gem"
+          type="button"
+        >
+          <span class="type-icon">
+            💎
+          </span>
+
+          <span class="gem-button-name">
+            Gem
+          </span>
+        </button>
+
+      </div>
+
+
+
+      <!-- PRICE -->
+
+      <div class="price-panel">
+
+        <div>
+
+          <span class="price-label">
+            Unit Price
+          </span>
+
+          <strong class="unit-price">
+            0 GP
+          </strong>
+
+        </div>
+
+
+        <div class="requirement-info"></div>
+
+      </div>
+
+
+
+      <!-- ORDER CONTROLS -->
+
+      <div class="material-controls">
+
+        <label class="quantity-field">
+
+          <span>
+            Quantity
+          </span>
+
+          <input
+            class="qty-input"
+            type="number"
+            min="1"
+            value="1"
+            inputmode="numeric"
+          />
+
+        </label>
+
+
+        <div class="line-price">
+
+          <span>
+            Total
+          </span>
+
+          <strong class="line-total">
+            0 GP
+          </strong>
+
+        </div>
+
+
+        <button
+          class="add-button"
+          type="button"
+        >
+          <span>
+            Add
+          </span>
+
+          <span>
+            +
+          </span>
+        </button>
+
+      </div>
+
+    </article>
+
+  </template>
+
+
+  <script src="script.js"></script>
+
+</body>
+</html>
