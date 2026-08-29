@@ -1,36 +1,31 @@
 // =====================================================
-// KORUXA MARKET
+// KORUXA ORE & GEM MARKET
 //
-// Gems automatically require 6 matching Ore.
-//
-// Effective Ore Quantity =
-// MAX(
-//   Ore manually ordered,
-//   Gems ordered × 6
-// )
-//
-// Example:
-//
-// Manual Ore = 4
-// Gems = 1
-//
-// Required Ore = 6
-// Basket displays 6 Ore.
-//
-// Only 2 Ore were automatically added.
+// RULES:
+// - 1 Gem requires 6 matching Ore
+// - Missing Ore is automatically added
+// - Maximum 75,000 of EACH Ore type per order
 // =====================================================
 
-
 const ORE_PER_GEM = 6;
+
+const MAX_ORE_PER_MATERIAL = 75000;
+
+const MAX_GEMS_PER_MATERIAL =
+  Math.floor(
+    MAX_ORE_PER_MATERIAL /
+    ORE_PER_GEM
+  );
 
 
 // =====================================================
 // CLOUDFLARE WORKER
 //
-// Paste your Worker URL here once deployed.
+// Paste your Cloudflare Worker URL here.
 //
 // Example:
-// https://koruxa-market-orders.username.workers.dev
+// const ORDER_ENDPOINT =
+//   "https://koruxa-orders.yourname.workers.dev";
 // =====================================================
 
 const ORDER_ENDPOINT = "";
@@ -160,15 +155,26 @@ const MATERIALS = [
 // =====================================================
 // STATE
 //
-// cart:
-// {
-//   Dustite: {
-//     manualOre: 4,
-//     gems: 1
-//   }
-// }
+// manualOre = Ore the buyer personally selected
 //
-// The displayed Ore becomes MAX(4, 6) = 6.
+// gems = Gems the buyer selected
+//
+// Displayed Ore becomes:
+//
+// MAX(
+//   manualOre,
+//   gems × 6
+// )
+//
+// Example:
+//
+// 4 Dustite Ore
+// + 1 Opal
+//
+// = 6 Dustite Ore
+//   1 Opal
+//
+// Only 2 Ore were automatically added.
 // =====================================================
 
 const state = {
@@ -251,7 +257,7 @@ const clearOrderButton =
 
 
 // =====================================================
-// FORMAT
+// GP FORMAT
 // =====================================================
 
 function gp(value) {
@@ -296,7 +302,9 @@ function getEntry(materialName) {
 
   }
 
-  return state.cart[materialName];
+  return state.cart[
+    materialName
+  ];
 
 }
 
@@ -308,7 +316,9 @@ function getEntry(materialName) {
 function getRequiredOre(materialName) {
 
   const entry =
-    getEntry(materialName);
+    getEntry(
+      materialName
+    );
 
   return (
     entry.gems *
@@ -321,19 +331,21 @@ function getRequiredOre(materialName) {
 // =====================================================
 // EFFECTIVE ORE
 //
-// This is the important part.
+// The basket displays whichever is larger:
 //
-// If manually ordered Ore is already enough,
-// NOTHING extra is added.
+// Ore manually ordered
 //
-// Otherwise, only the missing Ore is automatically
-// included.
+// OR
+//
+// Ore required by Gems
 // =====================================================
 
 function getEffectiveOre(materialName) {
 
   const entry =
-    getEntry(materialName);
+    getEntry(
+      materialName
+    );
 
   const requiredOre =
     getRequiredOre(
@@ -352,15 +364,17 @@ function getEffectiveOre(materialName) {
 
 
 // =====================================================
-// AUTOMATIC ORE AMOUNT
+// AUTOMATIC ORE
 // =====================================================
 
 function getAutomaticOre(materialName) {
 
   const entry =
-    getEntry(materialName);
+    getEntry(
+      materialName
+    );
 
-  const effective =
+  const effectiveOre =
     getEffectiveOre(
       materialName
     );
@@ -369,7 +383,7 @@ function getAutomaticOre(materialName) {
 
     0,
 
-    effective -
+    effectiveOre -
     entry.manualOre
 
   );
@@ -378,10 +392,14 @@ function getAutomaticOre(materialName) {
 
 
 // =====================================================
-// CLEAN EMPTY CART ENTRIES
+// NORMALIZE CART
+//
+// Makes sure old saved data can never exceed:
+// 75,000 Ore
+// 12,500 Gems
 // =====================================================
 
-function cleanupCart() {
+function normalizeCart() {
 
   Object.keys(
     state.cart
@@ -389,6 +407,55 @@ function cleanupCart() {
 
     const entry =
       state.cart[name];
+
+
+    if (
+      !entry ||
+      typeof entry !== "object"
+    ) {
+
+      delete state.cart[name];
+
+      return;
+
+    }
+
+
+    entry.manualOre =
+      Number(
+        entry.manualOre
+      ) || 0;
+
+
+    entry.gems =
+      Number(
+        entry.gems
+      ) || 0;
+
+
+    entry.manualOre =
+      Math.floor(
+        Math.max(
+          0,
+          Math.min(
+            entry.manualOre,
+            MAX_ORE_PER_MATERIAL
+          )
+        )
+      );
+
+
+    entry.gems =
+      Math.floor(
+        Math.max(
+          0,
+          Math.min(
+            entry.gems,
+            MAX_GEMS_PER_MATERIAL
+          )
+        )
+      );
+
 
     if (
       entry.manualOre <= 0 &&
@@ -405,10 +472,44 @@ function cleanupCart() {
 
 
 // =====================================================
-// SAVE
+// CLEANUP
+// =====================================================
+
+function cleanupCart() {
+
+  normalizeCart();
+
+
+  Object.keys(
+    state.cart
+  ).forEach(name => {
+
+    const entry =
+      state.cart[name];
+
+
+    if (
+      entry.manualOre <= 0 &&
+      entry.gems <= 0
+    ) {
+
+      delete state.cart[name];
+
+    }
+
+  });
+
+}
+
+
+// =====================================================
+// SAVE CART
 // =====================================================
 
 function saveCart() {
+
+  cleanupCart();
+
 
   localStorage.setItem(
 
@@ -424,12 +525,13 @@ function saveCart() {
 
 
 // =====================================================
-// TOTAL ITEM COUNT
+// ITEM COUNT
 // =====================================================
 
 function getTotalItemCount() {
 
   let total = 0;
+
 
   Object.keys(
     state.cart
@@ -438,13 +540,18 @@ function getTotalItemCount() {
     const entry =
       state.cart[name];
 
+
     total +=
-      getEffectiveOre(name);
+      getEffectiveOre(
+        name
+      );
+
 
     total +=
       entry.gems;
 
   });
+
 
   return total;
 
@@ -452,33 +559,45 @@ function getTotalItemCount() {
 
 
 // =====================================================
-// TOTAL PRICE
+// GRAND TOTAL
 // =====================================================
 
 function calculateGrandTotal() {
 
   let total = 0;
 
+
   Object.keys(
     state.cart
   ).forEach(name => {
 
     const material =
-      getMaterial(name);
+      getMaterial(
+        name
+      );
+
 
     if (!material) {
       return;
     }
 
+
     const entry =
       state.cart[name];
 
+
     const oreQty =
-      getEffectiveOre(name);
+      getEffectiveOre(
+        name
+      );
+
 
     total +=
+
       oreQty *
+
       material.orePrice;
+
 
     if (
       entry.gems > 0 &&
@@ -486,12 +605,15 @@ function calculateGrandTotal() {
     ) {
 
       total +=
+
         entry.gems *
+
         material.gemPrice;
 
     }
 
   });
+
 
   return total;
 
@@ -499,12 +621,14 @@ function calculateGrandTotal() {
 
 
 // =====================================================
-// RENDER MATERIALS
+// RENDER MARKET
 // =====================================================
 
 function renderMaterials() {
 
-  materialList.innerHTML = "";
+  materialList.innerHTML =
+    "";
+
 
   const query =
     state.search
@@ -524,6 +648,7 @@ function renderMaterials() {
             .join(" ")
             .toLowerCase();
 
+
         return searchable.includes(
           query
         );
@@ -532,14 +657,15 @@ function renderMaterials() {
     );
 
 
-  if (!materials.length) {
+  if (
+    !materials.length
+  ) {
 
     materialList.innerHTML = `
 
       <div class="no-results">
 
-        No materials match
-        "<strong>${state.search}</strong>"
+        No matching materials found.
 
       </div>
 
@@ -556,7 +682,9 @@ function renderMaterials() {
       const fragment =
         materialTemplate
           .content
-          .cloneNode(true);
+          .cloneNode(
+            true
+          );
 
 
       const card =
@@ -629,6 +757,10 @@ function renderMaterials() {
         "ore";
 
 
+      // =================================================
+      // GEM BUTTON NAME
+      // =================================================
+
       if (
         material.gemName
       ) {
@@ -636,10 +768,13 @@ function renderMaterials() {
         gemButtonName.textContent =
           material.gemName;
 
-      } else {
+      }
+
+      else {
 
         gemButtonName.textContent =
           "No Gem";
+
 
         gemButton.disabled =
           true;
@@ -648,7 +783,7 @@ function renderMaterials() {
 
 
       // =================================================
-      // SELECT TYPE
+      // UPDATE CARD DISPLAY
       // =================================================
 
       function updateTypeDisplay() {
@@ -657,55 +792,92 @@ function renderMaterials() {
 
           "gem-selected",
 
-          selectedType === "gem"
+          selectedType ===
+            "gem"
 
         );
 
 
+        // ---------------------------------------------
+        // ORE
+        // ---------------------------------------------
+
         if (
-          selectedType === "ore"
+          selectedType ===
+          "ore"
         ) {
 
           visualIcon.textContent =
             "⛏️";
 
+
           category.textContent =
             "ORE";
+
 
           title.textContent =
             material.name;
 
+
           secondary.textContent =
             material.gemName
+
               ? `Matching gem: ${material.gemName}`
+
               : "Ore only";
+
 
           unitPriceElement.textContent =
             gp(
               material.orePrice
             );
 
-          requirementInfo.innerHTML =
-            `Mine-ready material`;
+
+          const currentOre =
+            getEffectiveOre(
+              material.name
+            );
+
+
+          requirementInfo.innerHTML = `
+
+            ${currentOre.toLocaleString()}
+            /
+            ${MAX_ORE_PER_MATERIAL.toLocaleString()}
+
+            <br>
+
+            Ore in basket
+
+          `;
 
         }
 
 
+        // ---------------------------------------------
+        // GEM
+        // ---------------------------------------------
+
         if (
-          selectedType === "gem"
+          selectedType ===
+          "gem"
         ) {
 
           visualIcon.textContent =
             "💎";
 
+
           category.textContent =
             "UNCUT GEM";
+
 
           title.textContent =
             material.gemName;
 
+
           secondary.textContent =
             `Matched with ${material.name} Ore`;
+
 
           unitPriceElement.textContent =
             gp(
@@ -718,6 +890,7 @@ function renderMaterials() {
               material.name
             );
 
+
           const currentOre =
             getEffectiveOre(
               material.name
@@ -727,13 +900,20 @@ function renderMaterials() {
           requirementInfo.innerHTML = `
 
             <strong>
-              6 Ore / Gem
+              ${ORE_PER_GEM} Ore / Gem
             </strong>
 
             <br>
 
             ${currentOre.toLocaleString()}
-            Ore currently in basket
+            /
+            ${MAX_ORE_PER_MATERIAL.toLocaleString()}
+            Ore
+
+            <br>
+
+            Max ${MAX_GEMS_PER_MATERIAL.toLocaleString()}
+            Gems
 
           `;
 
@@ -744,7 +924,8 @@ function renderMaterials() {
 
           "active",
 
-          selectedType === "ore"
+          selectedType ===
+            "ore"
 
         );
 
@@ -753,7 +934,8 @@ function renderMaterials() {
 
           "active",
 
-          selectedType === "gem"
+          selectedType ===
+            "gem"
 
         );
 
@@ -789,12 +971,18 @@ function renderMaterials() {
 
 
         qtyInput.value =
-          String(quantity);
+          String(
+            quantity
+          );
 
 
         const price =
-          selectedType === "ore"
+
+          selectedType ===
+            "ore"
+
             ? material.orePrice
+
             : material.gemPrice;
 
 
@@ -820,6 +1008,7 @@ function renderMaterials() {
           selectedType =
             "ore";
 
+
           updateTypeDisplay();
 
         }
@@ -839,15 +1028,18 @@ function renderMaterials() {
 
           if (
             !material.gemName ||
-            material.gemPrice == null
+            material.gemPrice ==
+              null
           ) {
 
             return;
 
           }
 
+
           selectedType =
             "gem";
+
 
           updateTypeDisplay();
 
@@ -870,7 +1062,7 @@ function renderMaterials() {
 
 
       // =================================================
-      // ADD
+      // ADD BUTTON
       // =================================================
 
       addButton.addEventListener(
@@ -904,22 +1096,174 @@ function renderMaterials() {
             );
 
 
+          // =============================================
+          // ADD ORE
+          // =============================================
+
           if (
-            selectedType === "ore"
+            selectedType ===
+            "ore"
           ) {
 
-            entry.manualOre +=
+            const currentOre =
+              getEffectiveOre(
+                material.name
+              );
+
+
+            const remaining =
+              MAX_ORE_PER_MATERIAL -
+              currentOre;
+
+
+            if (
+              remaining <= 0
+            ) {
+
+              alert(
+
+                `You can only order a maximum of ${MAX_ORE_PER_MATERIAL.toLocaleString()} ${material.name} Ore.`
+
+              );
+
+              return;
+
+            }
+
+
+            quantity =
+              Math.min(
+                quantity,
+                remaining
+              );
+
+
+            /*
+              If Gems are already creating
+              automatic Ore, preserve the
+              currently displayed amount.
+
+              Example:
+
+              1 Gem created 6 automatic Ore.
+
+              They then add 10 Ore manually.
+
+              Result becomes 16 Ore total,
+              because they intentionally
+              added 10 more.
+            */
+
+            entry.manualOre =
+
+              Math.max(
+
+                entry.manualOre,
+
+                currentOre
+
+              ) +
+
               quantity;
+
+
+            entry.manualOre =
+              Math.min(
+
+                entry.manualOre,
+
+                MAX_ORE_PER_MATERIAL
+
+              );
 
           }
 
 
+          // =============================================
+          // ADD GEM
+          // =============================================
+
           if (
-            selectedType === "gem"
+            selectedType ===
+            "gem"
           ) {
 
-            entry.gems +=
+            if (
+              entry.gems >=
+              MAX_GEMS_PER_MATERIAL
+            ) {
+
+              alert(
+
+                `You have reached the maximum of ${MAX_GEMS_PER_MATERIAL.toLocaleString()} ${material.gemName}.`
+
+              );
+
+              return;
+
+            }
+
+
+            const remainingGems =
+
+              MAX_GEMS_PER_MATERIAL -
+
+              entry.gems;
+
+
+            quantity =
+              Math.min(
+
+                quantity,
+
+                remainingGems
+
+              );
+
+
+            const newGemTotal =
+
+              entry.gems +
+
               quantity;
+
+
+            const requiredOre =
+
+              newGemTotal *
+
+              ORE_PER_GEM;
+
+
+            const finalOre =
+
+              Math.max(
+
+                entry.manualOre,
+
+                requiredOre
+
+              );
+
+
+            if (
+              finalOre >
+              MAX_ORE_PER_MATERIAL
+            ) {
+
+              alert(
+
+                `This order would require more than ${MAX_ORE_PER_MATERIAL.toLocaleString()} ${material.name} Ore.`
+
+              );
+
+              return;
+
+            }
+
+
+            entry.gems =
+              newGemTotal;
 
           }
 
@@ -932,16 +1276,13 @@ function renderMaterials() {
 
           renderMaterials();
 
-
-          addButton.textContent =
-            "Added ✓";
-
         }
 
       );
 
 
       updateTypeDisplay();
+
 
       materialList.appendChild(
         fragment
@@ -954,7 +1295,7 @@ function renderMaterials() {
 
 
 // =====================================================
-// CART ROW CREATOR
+// CREATE BASKET ROW
 // =====================================================
 
 function createCartRow({
@@ -984,6 +1325,7 @@ function createCartRow({
       "div"
     );
 
+
   row.className =
     "cart-row";
 
@@ -1007,11 +1349,15 @@ function createCartRow({
 
       ${
         note
+
           ? `
+
             <div class="auto-ore-note">
               ${note}
             </div>
+
           `
+
           : ""
       }
 
@@ -1029,7 +1375,10 @@ function createCartRow({
 
         <button
           type="button"
-          class="cart-control-button minus"
+          class="
+            cart-control-button
+            minus
+          "
         >
           −
         </button>
@@ -1042,7 +1391,10 @@ function createCartRow({
 
         <button
           type="button"
-          class="cart-control-button plus"
+          class="
+            cart-control-button
+            plus
+          "
         >
           +
         </button>
@@ -1072,8 +1424,11 @@ function createCartRow({
       ".minus"
     )
     .addEventListener(
+
       "click",
+
       onMinus
+
     );
 
 
@@ -1082,8 +1437,11 @@ function createCartRow({
       ".plus"
     )
     .addEventListener(
+
       "click",
+
       onPlus
+
     );
 
 
@@ -1092,8 +1450,11 @@ function createCartRow({
       ".remove"
     )
     .addEventListener(
+
       "click",
+
       onRemove
+
     );
 
 
@@ -1103,12 +1464,13 @@ function createCartRow({
 
 
 // =====================================================
-// RENDER CART
+// RENDER BASKET
 // =====================================================
 
 function renderCart() {
 
   cleanupCart();
+
 
   cartItems.innerHTML =
     "";
@@ -1120,7 +1482,13 @@ function renderCart() {
     );
 
 
-  if (!materialNames.length) {
+  // =================================================
+  // EMPTY BASKET
+  // =================================================
+
+  if (
+    !materialNames.length
+  ) {
 
     cartItems.innerHTML = `
 
@@ -1135,7 +1503,7 @@ function renderCart() {
         </strong>
 
         <span>
-          Add some ore or gems above.
+          Add some Ore or Gems above.
         </span>
 
       </div>
@@ -1144,6 +1512,10 @@ function renderCart() {
 
   }
 
+
+  // =================================================
+  // MATERIALS
+  // =================================================
 
   materialNames.forEach(
     materialName => {
@@ -1181,15 +1553,36 @@ function renderCart() {
       // ORE ROW
       // =================================================
 
-      if (oreQty > 0) {
+      if (
+        oreQty > 0
+      ) {
 
         let note = "";
 
 
-        if (autoOre > 0) {
+        if (
+          autoOre > 0
+        ) {
 
           note =
-            `${autoOre.toLocaleString()} Ore automatically added for your gem order`;
+
+            `${autoOre.toLocaleString()} Ore automatically added for your Gem order`;
+
+        }
+
+
+        if (
+          oreQty >=
+          MAX_ORE_PER_MATERIAL
+        ) {
+
+          note +=
+
+            `${
+              note
+                ? " • "
+                : ""
+            }75,000 Ore maximum reached`;
 
         }
 
@@ -1200,30 +1593,37 @@ function renderCart() {
             icon:
               "⛏️",
 
+
             name:
               `${material.name} Ore`,
 
+
             metadata:
+
               `${oreQty.toLocaleString()} × ${gp(material.orePrice)}`,
 
+
             note,
+
 
             quantity:
               oreQty.toLocaleString(),
 
+
             price:
+
               gp(
+
                 oreQty *
+
                 material.orePrice
+
               ),
 
 
-            // -------------------------------------------
+            // ===========================================
             // MINUS ORE
-            //
-            // Only manual Ore can actually be removed.
-            // Required Ore for Gems stays.
-            // -------------------------------------------
+            // ===========================================
 
             onMinus() {
 
@@ -1234,6 +1634,7 @@ function renderCart() {
                 entry.manualOre--;
 
               }
+
 
               cleanupCart();
 
@@ -1246,24 +1647,55 @@ function renderCart() {
             },
 
 
-            // -------------------------------------------
+            // ===========================================
             // PLUS ORE
-            // -------------------------------------------
+            // ===========================================
 
             onPlus() {
 
-              // If current displayed Ore is automatic,
-              // adding +1 means the buyer now wants
-              // one more than the displayed amount.
+              const currentOre =
+                getEffectiveOre(
+                  materialName
+                );
+
+
+              if (
+                currentOre >=
+                MAX_ORE_PER_MATERIAL
+              ) {
+
+                alert(
+
+                  `Maximum ${MAX_ORE_PER_MATERIAL.toLocaleString()} ${materialName} Ore per order.`
+
+                );
+
+                return;
+
+              }
+
 
               entry.manualOre =
+
                 Math.max(
 
                   entry.manualOre,
 
-                  oreQty
+                  currentOre
 
-                ) + 1;
+                ) +
+
+                1;
+
+
+              entry.manualOre =
+                Math.min(
+
+                  entry.manualOre,
+
+                  MAX_ORE_PER_MATERIAL
+
+                );
 
 
               saveCart();
@@ -1275,17 +1707,18 @@ function renderCart() {
             },
 
 
-            // -------------------------------------------
+            // ===========================================
             // REMOVE ORE
-            // -------------------------------------------
+            //
+            // If Gems still need Ore,
+            // required Ore remains.
+            // ===========================================
 
             onRemove() {
 
-              entry.manualOre = 0;
+              entry.manualOre =
+                0;
 
-
-              // Required Ore remains automatically
-              // if Gems are still ordered.
 
               cleanupCart();
 
@@ -1322,35 +1755,50 @@ function renderCart() {
             icon:
               "💎",
 
+
             name:
+
               `${material.gemName} (Uncut Gem)`,
 
+
             metadata:
+
               `${entry.gems.toLocaleString()} × ${gp(material.gemPrice)}`,
 
+
             note:
+
               `Requires ${(entry.gems * ORE_PER_GEM).toLocaleString()} ${material.name} Ore`,
+
 
             quantity:
               entry.gems.toLocaleString(),
 
+
             price:
+
               gp(
+
                 entry.gems *
+
                 material.gemPrice
+
               ),
 
 
-            // -------------------------------------------
+            // ===========================================
             // MINUS GEM
-            // -------------------------------------------
+            // ===========================================
 
             onMinus() {
 
               entry.gems =
                 Math.max(
+
                   0,
+
                   entry.gems - 1
+
                 );
 
 
@@ -1365,11 +1813,49 @@ function renderCart() {
             },
 
 
-            // -------------------------------------------
+            // ===========================================
             // PLUS GEM
-            // -------------------------------------------
+            // ===========================================
 
             onPlus() {
+
+              const newGemQuantity =
+                entry.gems + 1;
+
+
+              const requiredOre =
+
+                newGemQuantity *
+
+                ORE_PER_GEM;
+
+
+              const finalOre =
+
+                Math.max(
+
+                  entry.manualOre,
+
+                  requiredOre
+
+                );
+
+
+              if (
+                finalOre >
+                MAX_ORE_PER_MATERIAL
+              ) {
+
+                alert(
+
+                  `You cannot add another ${material.gemName}. The order is limited to ${MAX_ORE_PER_MATERIAL.toLocaleString()} ${materialName} Ore.`
+
+                );
+
+                return;
+
+              }
+
 
               entry.gems++;
 
@@ -1383,13 +1869,19 @@ function renderCart() {
             },
 
 
-            // -------------------------------------------
+            // ===========================================
             // REMOVE GEM
-            // -------------------------------------------
+            //
+            // Automatic Ore disappears if it
+            // is no longer required.
+            //
+            // Manually ordered Ore remains.
+            // ===========================================
 
             onRemove() {
 
-              entry.gems = 0;
+              entry.gems =
+                0;
 
 
               cleanupCart();
@@ -1416,7 +1908,7 @@ function renderCart() {
 
 
   // =================================================
-  // TOTAL
+  // COUNTS
   // =================================================
 
   const totalItems =
@@ -1431,6 +1923,10 @@ function renderCart() {
     totalItems.toLocaleString();
 
 
+  // =================================================
+  // TOTAL
+  // =================================================
+
   grandTotal.textContent =
     gp(
       calculateGrandTotal()
@@ -1438,32 +1934,50 @@ function renderCart() {
 
 
   // =================================================
-  // AUTOMATIC ORE MESSAGE
+  // AUTO ORE MESSAGE
   // =================================================
 
   const totalAutoOre =
+
     Object.keys(
       state.cart
     )
+
       .reduce(
-        (sum, name) => {
+
+        (
+          sum,
+          name
+        ) => {
 
           return (
+
             sum +
-            getAutomaticOre(name)
+
+            getAutomaticOre(
+              name
+            )
+
           );
 
         },
+
         0
+
       );
 
 
-  if (totalAutoOre > 0) {
+  if (
+    totalAutoOre > 0
+  ) {
 
     validationMessage.textContent =
+
       `✓ ${totalAutoOre.toLocaleString()} required Ore automatically included for Gem purchases.`;
 
-  } else {
+  }
+
+  else {
 
     validationMessage.textContent =
       "";
@@ -1474,7 +1988,7 @@ function renderCart() {
 
 
 // =====================================================
-// BUILD FINAL ORDER
+// BUILD ORDER
 // =====================================================
 
 function buildOrder() {
@@ -1510,7 +2024,13 @@ function buildOrder() {
         );
 
 
-      if (oreQty > 0) {
+      // =================================================
+      // ORE
+      // =================================================
+
+      if (
+        oreQty > 0
+      ) {
 
         items.push({
 
@@ -1530,10 +2050,13 @@ function buildOrder() {
             material.orePrice,
 
           total:
+
             oreQty *
+
             material.orePrice,
 
           automaticOre:
+
             getAutomaticOre(
               materialName
             )
@@ -1542,6 +2065,10 @@ function buildOrder() {
 
       }
 
+
+      // =================================================
+      // GEM
+      // =================================================
 
       if (
         entry.gems > 0 &&
@@ -1566,7 +2093,9 @@ function buildOrder() {
             material.gemPrice,
 
           total:
+
             entry.gems *
+
             material.gemPrice
 
         });
@@ -1580,21 +2109,29 @@ function buildOrder() {
   return {
 
     customerName:
+
       customerName
         .value
         .trim(),
 
+
     notes:
+
       orderNotes
         .value
         .trim(),
 
+
     items,
 
+
     total:
+
       calculateGrandTotal(),
 
+
     submittedAt:
+
       new Date()
         .toISOString()
 
@@ -1616,6 +2153,7 @@ searchInput.addEventListener(
     state.search =
       event.target.value;
 
+
     renderMaterials();
 
   }
@@ -1624,7 +2162,7 @@ searchInput.addEventListener(
 
 
 // =====================================================
-// CUSTOMER STORAGE
+// SAVE CUSTOMER NAME
 // =====================================================
 
 customerName.addEventListener(
@@ -1645,6 +2183,10 @@ customerName.addEventListener(
 
 );
 
+
+// =====================================================
+// SAVE NOTES
+// =====================================================
 
 orderNotes.addEventListener(
 
@@ -1728,6 +2270,7 @@ submitOrderButton.addEventListener(
     submitStatus.className =
       "submit-status";
 
+
     submitStatus.textContent =
       "";
 
@@ -1735,9 +2278,9 @@ submitOrderButton.addEventListener(
     cleanupCart();
 
 
-    // -----------------------------------------------
+    // =================================================
     // EMPTY
-    // -----------------------------------------------
+    // =================================================
 
     if (
       !Object.keys(
@@ -1748,17 +2291,19 @@ submitOrderButton.addEventListener(
       submitStatus.className =
         "submit-status error";
 
+
       submitStatus.textContent =
         "Your basket is empty.";
+
 
       return;
 
     }
 
 
-    // -----------------------------------------------
-    // NAME REQUIRED
-    // -----------------------------------------------
+    // =================================================
+    // CUSTOMER NAME
+    // =================================================
 
     if (
       !customerName
@@ -1769,27 +2314,73 @@ submitOrderButton.addEventListener(
       submitStatus.className =
         "submit-status error";
 
+
       submitStatus.textContent =
         "Please enter your Discord or game name.";
 
+
       customerName.focus();
+
 
       return;
 
     }
 
 
-    // -----------------------------------------------
-    // ENDPOINT NOT SET
-    // -----------------------------------------------
+    // =================================================
+    // FINAL 75K SAFETY CHECK
+    // =================================================
 
-    if (!ORDER_ENDPOINT) {
+    for (
+      const materialName
+      of Object.keys(
+        state.cart
+      )
+    ) {
+
+      const oreQty =
+        getEffectiveOre(
+          materialName
+        );
+
+
+      if (
+        oreQty >
+        MAX_ORE_PER_MATERIAL
+      ) {
+
+        submitStatus.className =
+          "submit-status error";
+
+
+        submitStatus.textContent =
+
+          `${materialName} exceeds the ${MAX_ORE_PER_MATERIAL.toLocaleString()} Ore limit.`;
+
+
+        return;
+
+      }
+
+    }
+
+
+    // =================================================
+    // WORKER NOT CONFIGURED
+    // =================================================
+
+    if (
+      !ORDER_ENDPOINT
+    ) {
 
       submitStatus.className =
         "submit-status error";
 
+
       submitStatus.textContent =
+
         "Your market is ready, but the Cloudflare Worker URL still needs to be added to script.js.";
+
 
       return;
 
@@ -1800,17 +2391,35 @@ submitOrderButton.addEventListener(
       buildOrder();
 
 
+    // =================================================
+    // LOADING
+    // =================================================
+
     submitOrderButton.disabled =
       true;
 
 
-    submitOrderButton
-      .querySelector(
-        "span:first-child"
-      )
-      .textContent =
+    const submitText =
+
+      submitOrderButton
+        .querySelector(
+          "span:first-child"
+        );
+
+
+    if (
+      submitText
+    ) {
+
+      submitText.textContent =
         "Submitting...";
 
+    }
+
+
+    // =================================================
+    // SEND
+    // =================================================
 
     try {
 
@@ -1832,6 +2441,7 @@ submitOrderButton.addEventListener(
             },
 
             body:
+
               JSON.stringify(
                 order
               )
@@ -1842,23 +2452,31 @@ submitOrderButton.addEventListener(
 
 
       const result =
-        await response.json()
+        await response
+          .json()
           .catch(
             () => ({})
           );
 
 
-      if (!response.ok) {
+      if (
+        !response.ok
+      ) {
 
         throw new Error(
 
           result.error ||
+
           "Order submission failed."
 
         );
 
       }
 
+
+      // =================================================
+      // SUCCESS
+      // =================================================
 
       submitStatus.className =
         "submit-status success";
@@ -1887,29 +2505,41 @@ submitOrderButton.addEventListener(
       renderMaterials();
 
 
-      submitOrderButton
-        .querySelector(
-          "span:first-child"
-        )
-        .textContent =
+      if (
+        submitText
+      ) {
+
+        submitText.textContent =
           "Order Submitted ✓";
+
+      }
 
 
       setTimeout(
+
         () => {
 
-          submitOrderButton
-            .querySelector(
-              "span:first-child"
-            )
-            .textContent =
+          if (
+            submitText
+          ) {
+
+            submitText.textContent =
               "Submit Order";
 
+          }
+
         },
+
         2500
+
       );
 
     }
+
+
+    // =================================================
+    // ERROR
+    // =================================================
 
     catch (error) {
 
@@ -1923,18 +2553,27 @@ submitOrderButton.addEventListener(
 
 
       submitStatus.textContent =
+
         error.message ||
+
         "Unable to submit the order.";
 
 
-      submitOrderButton
-        .querySelector(
-          "span:first-child"
-        )
-        .textContent =
+      if (
+        submitText
+      ) {
+
+        submitText.textContent =
           "Submit Order";
 
+      }
+
     }
+
+
+    // =================================================
+    // FINISH
+    // =================================================
 
     finally {
 
@@ -1960,6 +2599,7 @@ try {
       localStorage.getItem(
         "koruxaMarketCart"
       ) ||
+
       "{}"
 
     );
@@ -1989,16 +2629,22 @@ catch {
 
 
 // =====================================================
-// LOAD CUSTOMER
+// LOAD SAVED CUSTOMER NAME
 // =====================================================
 
 customerName.value =
+
   localStorage.getItem(
     "koruxaCustomerName"
   ) || "";
 
 
+// =====================================================
+// LOAD SAVED NOTES
+// =====================================================
+
 orderNotes.value =
+
   localStorage.getItem(
     "koruxaOrderNotes"
   ) || "";
@@ -2008,7 +2654,11 @@ orderNotes.value =
 // START
 // =====================================================
 
+normalizeCart();
+
 cleanupCart();
+
+saveCart();
 
 renderMaterials();
 
